@@ -1,0 +1,71 @@
+.
+├── arguments
+│   └── __init__.py
+├── assets
+│   ├── teaser.jpg
+│   └── unbounded.gif
+├── convert.py
+├── environment.yml
+├── gaussian_renderer
+│   ├── __init__.py
+│   └── network_gui.py
+├── LICENSE.md
+├── lpipsPyTorch
+│   ├── __init__.py
+│   └── modules
+│       ├── lpips.py
+│       ├── networks.py
+│       └── utils.py
+├── metrics.py
+├── README.md
+├── render.py
+├── scene
+│   ├── __init__.py
+│   ├── cameras.py
+│   ├── colmap_loader.py
+│   ├── dataset_readers.py
+│   └── gaussian_model.py
+├── scripts
+│   ├── dtu_eval.py
+│   ├── eval_dtu
+│   │   ├── eval.py
+│   │   ├── evaluate_single_scene.py
+│   │   └── render_utils.py
+│   ├── eval_tnt
+│   │   ├── compute_bbox_for_mesh.py
+│   │   ├── config.py
+│   │   ├── cull_mesh.py
+│   │   ├── evaluate_single_scene.py
+│   │   ├── evaluation.py
+│   │   ├── help_func.py
+│   │   ├── plot.py
+│   │   ├── README.md
+│   │   ├── registration.py
+│   │   ├── requirements.txt
+│   │   ├── run.py
+│   │   ├── trajectory_io.py
+│   │   └── util.py
+│   ├── m360_eval.py
+│   ├── nerf_eval.py
+│   ├── summary.py
+│   └── tnt_eval.py
+├── submodules
+│   ├── diff-surfel-rasterization
+│   └── simple-knn
+├── train.py
+├── tree.txt
+├── utils
+│   ├── camera_utils.py
+│   ├── general_utils.py
+│   ├── graphics_utils.py
+│   ├── image_utils.py
+│   ├── loss_utils.py
+│   ├── mcube_utils.py
+│   ├── mesh_utils.py
+│   ├── point_utils.py
+│   ├── render_utils.py
+│   ├── sh_utils.py
+│   └── system_utils.py
+└── view.py
+
+14 directories, 55 files
