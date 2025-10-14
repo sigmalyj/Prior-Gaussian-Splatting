@@ -57,12 +57,25 @@ def metric3d_vit_small(pretrain=False, **kwargs):
       model.load_state_dict(state_dict, strict=False)
   return model
 
-def process_image(rgb_file):
-    import cv2
-    import torch
-    import numpy as np
-    # 读取并转为RGB
-    rgb_origin = cv2.imread(rgb_file)[:, :, ::-1]
+if __name__ == '__main__':
+  import cv2
+  import numpy as np
+  from glob import glob
+
+  # 创建输出目录
+  os.makedirs('preprocessed_data/normal', exist_ok=True)
+  os.makedirs('preprocessed_data/depth', exist_ok=True)
+
+  # 加载模型
+  model = metric3d_vit_small(pretrain=True)
+  model.cuda().eval()
+
+  rgb_files = glob('data/*.png')
+  print(f"共找到 {len(rgb_files)} 张RGB图像")
+
+  for rgb_file in rgb_files:
+    print(f"\n处理: {rgb_file}")
+    rgb_origin = cv2.imread(rgb_file)[:, :, ::-1] # 读取并转为RGB
 
     # 生成灰度图像并保存到同一目录
     depth_file = os.path.join(os.path.dirname(rgb_file), os.path.basename(rgb_file).replace('.png', '_gray.png'))
@@ -71,6 +84,7 @@ def process_image(rgb_file):
 
     # 调整输入尺寸以适配预训练模型
     intrinsic = [707.0493, 707.0493, 604.0814, 180.5066]
+    gt_depth_scale = 256.0
     input_size = (616, 1064)
     h, w = rgb_origin.shape[:2]
     scale = min(input_size[0] / h, input_size[1] / w)
@@ -92,11 +106,9 @@ def process_image(rgb_file):
     rgb = torch.div((rgb - mean), std)
     rgb = rgb[None, :, :, :].cuda()
 
-    # 加载模型并推理
-    model = metric3d_vit_small(pretrain=True)
-    model.cuda().eval()
+    # 推理
     with torch.no_grad():
-        pred_depth, confidence, output_dict = model.inference({'input': rgb})
+      pred_depth, confidence, output_dict = model.inference({'input': rgb})
 
     # 去除填充并上采样到原始尺寸
     pred_depth = pred_depth.squeeze()
@@ -118,33 +130,14 @@ def process_image(rgb_file):
 
     # 保存法线图
     if 'prediction_normal' in output_dict:
-        pred_normal = output_dict['prediction_normal'][:, :3, :, :]
-        pred_normal = pred_normal.squeeze()
-        pred_normal = pred_normal[:, pad_info[0] : pred_normal.shape[1] - pad_info[1], pad_info[2] : pred_normal.shape[2] - pad_info[3]]
-        pred_normal_vis = pred_normal.cpu().numpy().transpose((1, 2, 0))
-        pred_normal_vis = (pred_normal_vis + 1) / 2
-        normal_out_path = os.path.join('preprocessed_data/normal', os.path.basename(rgb_file).replace('.png', '_normal.png'))
-        cv2.imwrite(normal_out_path, (pred_normal_vis * 255).astype(np.uint8))
-
+      pred_normal = output_dict['prediction_normal'][:, :3, :, :]
+      pred_normal = pred_normal.squeeze()
+      pred_normal = pred_normal[:, pad_info[0] : pred_normal.shape[1] - pad_info[1], pad_info[2] : pred_normal.shape[2] - pad_info[3]]
+      pred_normal_vis = pred_normal.cpu().numpy().transpose((1, 2, 0))
+      pred_normal_vis = (pred_normal_vis + 1) / 2
+      normal_out_path = os.path.join('preprocessed_data/normal', os.path.basename(rgb_file).replace('.png', '_normal.png'))
+      cv2.imwrite(normal_out_path, (pred_normal_vis * 255).astype(np.uint8))
+    
     # 删除生成的灰度图像
     if os.path.exists(depth_file):
-        os.remove(depth_file)
-
-if __name__ == '__main__':
-    import cv2
-    import numpy as np
-    from glob import glob
-    from concurrent.futures import ThreadPoolExecutor
-
-    # 设置线程数参数
-    num_threads = 4  # 可根据需要调整线程数
-
-    # 创建输出目录
-    os.makedirs('preprocessed_data/normal', exist_ok=True)
-    os.makedirs('preprocessed_data/depth', exist_ok=True)
-
-    rgb_files = glob('data/*.png')
-    print(f"共找到 {len(rgb_files)} 张RGB图像")
-
-    with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        executor.map(process_image, rgb_files)
+      os.remove(depth_file)
