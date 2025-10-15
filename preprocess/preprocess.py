@@ -74,7 +74,6 @@ if __name__ == '__main__':
   print(f"共找到 {len(rgb_files)} 张RGB图像")
 
   for rgb_file in rgb_files:
-    print(f"\n处理: {rgb_file}")
     rgb_origin = cv2.imread(rgb_file)[:, :, ::-1] # 读取并转为RGB
 
     # 生成灰度图像并保存到同一目录

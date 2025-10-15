@@ -12,7 +12,7 @@
 import os
 import torch
 from random import randint
-from utils.loss_utils import l1_loss, ssim
+from utils.loss_utils import l1_loss, ssim, depth_loss, normal_loss
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -97,24 +97,35 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
-        
-        # 正则化项：法向量损失和距离损失
-        # 法向量损失在7000次迭代后开始，距离损失在3000次迭代后开始
-        lambda_normal = opt.lambda_normal if iteration > 7000 else 0.0
-        lambda_dist = opt.lambda_dist if iteration > 3000 else 0.0
 
-        rend_dist = render_pkg["rend_dist"]  # 渲染距离
-        rend_normal  = render_pkg['rend_normal']  # 渲染法向量
-        surf_normal = render_pkg['surf_normal']   # 表面法向量
-        
-        # 计算法向量误差：1 - cos(θ)，其中θ是渲染法向量和表面法向量的夹角
-        normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
-        normal_loss = lambda_normal * (normal_error).mean()
-        dist_loss = lambda_dist * (rend_dist).mean()
+        # 正则化项：法向量损失和深度损失
+        # 法向量损失在7000次迭代后开始，深度损失在3000次迭代后开始
+        lambda_normal = opt.lambda_normal if iteration > 7000 else 0.0
+        lambda_depth = opt.lambda_dist if iteration > 3000 else 0.0
+
+        rend_depth = render_pkg["rend_dist"].squeeze()  # 渲染深度
+        rend_normal  = render_pkg['rend_normal'] # 渲染法向量
+        surf_normal = render_pkg['surf_normal'] # 渲染表面法向量
+
+        # 计算深度损失
+        # depth_img_name = viewpoint_cam.image_name + '_depth.png'
+        # metric_depth_path = os.path.join('preprocess/preprocessed_data/depth', depth_img_name)
+        # loss_depth = depth_loss(rendered_depth, metric_depth_path)
+        dist_loss = lambda_depth * (rend_depth).mean()
+
+        # 计算法向量损失
+        # normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
+        # normal_loss = lambda_normal * (normal_error).mean()
+        normal_img_name = viewpoint_cam.image_name.replace('.png', '_normal.png')
+        metric_normal_path = os.path.join('preprocess/preprocessed_data/normal', normal_img_name)
+        loss_normal = normal_loss(rend_normal, metric_normal_path)
+
 
         # 总损失
-        total_loss = loss + dist_loss + normal_loss
-        
+        total_loss = loss + dist_loss + loss_normal
+        # total_loss = loss + dist_loss + normal_loss
+        # total_loss = loss + lambda_depth * loss_depth + normal_loss
+
         # 反向传播
         total_loss.backward()
 
@@ -124,6 +135,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # 更新用于显示的指数移动平均损失
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
             ema_dist_for_log = 0.4 * dist_loss.item() + 0.6 * ema_dist_for_log
+            # ema_dist_for_log = 0.4 * loss_depth.item() + 0.6 * ema_dist_for_log
             ema_normal_for_log = 0.4 * normal_loss.item() + 0.6 * ema_normal_for_log
 
             # 每10次迭代更新进度条
