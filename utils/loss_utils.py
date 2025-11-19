@@ -60,7 +60,7 @@ def depth_loss(rendered_depth, metric_depth_path, w=1.0, q=0.0):
     return loss
 
 # 新增的法向损失函数
-def normal_loss(rendered_normal, metric_normal_path):
+def pr_normal_loss(rendered_normal, metric_normal_path):
     """
     计算渲染法向与Metric3D预测法向之间的L2损失
     :param rendered_normal: torch.Tensor, 渲染得到的法向 (3xHxW)

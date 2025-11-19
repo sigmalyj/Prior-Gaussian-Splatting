@@ -12,7 +12,7 @@
 import os
 import torch
 from random import randint
-from utils.loss_utils import l1_loss, ssim, depth_loss, normal_loss
+from utils.loss_utils import l1_loss, ssim, depth_loss, pr_normal_loss
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -114,15 +114,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         dist_loss = lambda_depth * (rend_depth).mean()
 
         # 计算法向量损失
-        # normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
-        # normal_loss = lambda_normal * (normal_error).mean()
-        normal_img_name = viewpoint_cam.image_name.replace('.png', '_normal.png')
-        metric_normal_path = os.path.join('preprocess/preprocessed_data/normal', normal_img_name)
-        loss_normal = normal_loss(rend_normal, metric_normal_path)
+        normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
+        normal_loss = lambda_normal * (normal_error).mean()
+        pr_normal_img_name = viewpoint_cam.image_name + '_normal.png'
+        metric_normal_path = os.path.join('preprocess/preprocessed_data/normal', pr_normal_img_name)
+        loss_pr_normal = pr_normal_loss(rend_normal, metric_normal_path)
 
 
         # 总损失
-        total_loss = loss + dist_loss + loss_normal
+        total_loss = loss + dist_loss + lambda_normal * (loss_pr_normal + normal_loss)
         # total_loss = loss + dist_loss + normal_loss
         # total_loss = loss + lambda_depth * loss_depth + normal_loss
 
@@ -137,6 +137,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             ema_dist_for_log = 0.4 * dist_loss.item() + 0.6 * ema_dist_for_log
             # ema_dist_for_log = 0.4 * loss_depth.item() + 0.6 * ema_dist_for_log
             ema_normal_for_log = 0.4 * normal_loss.item() + 0.6 * ema_normal_for_log
+            ema_pr_normal_for_log = 0.4 * loss_pr_normal.item() + 0.6 * ema_normal_for_log
 
             # 每10次迭代更新进度条
             if iteration % 10 == 0:
@@ -144,6 +145,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     "Loss": f"{ema_loss_for_log:.{5}f}",      # 主要损失
                     "distort": f"{ema_dist_for_log:.{5}f}",   # 距离损失
                     "normal": f"{ema_normal_for_log:.{5}f}",  # 法向量损失
+                    "pr_normal": f"{ema_pr_normal_for_log:.{5}f}",  # 预处理法向量损失
                     "Points": f"{len(gaussians.get_xyz)}"     # 高斯点数量
                 }
                 progress_bar.set_postfix(loss_dict)
@@ -156,6 +158,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if tb_writer is not None:
                 tb_writer.add_scalar('train_loss_patches/dist_loss', ema_dist_for_log, iteration)
                 tb_writer.add_scalar('train_loss_patches/normal_loss', ema_normal_for_log, iteration)
+                tb_writer.add_scalar('train_loss_patches/pr_normal_loss', ema_pr_normal_for_log, iteration)
 
             # 训练报告（包含测试和验证）
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
